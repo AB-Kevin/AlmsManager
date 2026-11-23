@@ -1,7 +1,7 @@
 {
   "name": "almsmanager",
   "productName": "AlmsManager",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "AlmsManager - alms requests for members and churches, their approval, the quarterly checks or invoice write-offs they need, and each year's review, with daily reminders sent by Power Automate",
   "author": "Anabaptist Brotherhood",
   "license": "UNLICENSED",
