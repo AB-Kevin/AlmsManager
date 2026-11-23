@@ -56,3 +56,32 @@ test('reminder addresses', () => {
   store.writeSettings(dir, { reminderEmail: 'a@example.org' }, { by: 'Kim', now: new Date('2027-01-01T00:00:00Z') });
   assert.deepEqual(store.readSettings(dir), { version: 1, reminderEmail: 'a@example.org', updatedAt: '2027-01-01T00:00:00.000Z', updatedBy: 'Kim' });
 });
+
+test('documents are copied into the case folder, never over another', () => {
+  const dir = folder();
+  const src = path.join(folder(), 'Rent letter.pdf');
+  fs.writeFileSync(src, 'pdf');
+  const first = store.copyDocument(dir, ID, src);
+  const second = store.copyDocument(dir, ID, src);
+  assert.deepEqual([first.file, second.file], ['Rent letter.pdf', 'Rent letter (2).pdf']);
+  assert.equal(first.size, 3);
+  assert.equal(fs.readFileSync(store.documentPath(dir, ID, second.file), 'utf8'), 'pdf');
+  store.deleteDocument(dir, ID, first.file);
+  assert.ok(!fs.existsSync(store.documentPath(dir, ID, first.file)));
+  assert.throws(() => store.copyDocument(dir, ID, path.join(dir, 'missing.pdf')), /can't be found/);
+  assert.throws(() => store.copyDocument(dir, ID, dir), /folder, not a file/);
+});
+
+test('a document path never leaves the case folder', () => {
+  const dir = folder();
+  assert.throws(() => store.documentPath(dir, ID, '..\settings.json'), /can't be found/);
+  assert.throws(() => store.documentPath(dir, ID, '../x'), /can't be found/);
+  assert.throws(() => store.documentPath(dir, 'not-a-case', 'a.pdf'), /can't be found/);
+});
+
+test('file names are made safe for Windows and OneDrive', () => {
+  assert.equal(store.safeFileName('a:b?c.pdf'), 'a_b_c.pdf');
+  assert.equal(store.safeFileName('notes. '), 'notes');
+  assert.equal(store.safeFileName('CON.txt'), '_CON.txt');
+  assert.equal(store.safeFileName('.pdf'), 'document.pdf');
+});

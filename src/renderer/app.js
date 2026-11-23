@@ -377,6 +377,19 @@
     if (c.status === 'closed') facts.push(['Closed', esc(date(c.closedOn))]);
     if (c.notes) facts.push(['Notes', `<span class="pre">${esc(c.notes)}</span>`]);
 
+    const docs = c.documents || [];
+    const documents = `
+      <div class="sub-head">
+        <h3 class="sub">Documents</h3>
+        <button type="button" class="btn btn-secondary btn-sm" data-act="addDocs">Add document…</button>
+      </div>
+      ${docs.length ? `<ul class="docs">${docs.map((d) => `
+        <li>
+          <button type="button" class="link inline" data-doc-open="${esc(d.id)}">${esc(d.name)}</button>
+          <span class="muted small">${esc([fileSize(d.size), `added ${new Date(d.addedAt).toLocaleDateString()} by ${d.addedBy}`].filter(Boolean).join(' · '))}</span>
+          <button type="button" class="link" data-doc-remove="${esc(d.id)}">Remove</button>
+        </li>`).join('')}</ul>` : '<p class="muted small">No documents yet. Add one, or drop files on this window.</p>'}`;
+
     const tasks = c.tasks.length ? `
       <h3 class="sub">Tasks</h3>
       <table class="table">
@@ -391,6 +404,7 @@
     return `
       <div class="case-head"><span class="tag ${stateTag}">${esc(stateText)}</span><div class="actions">${actions.join('')}</div></div>
       <dl class="facts">${facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join('')}</dl>
+      ${documents}
       ${tasks}
       ${history}`;
   }
@@ -413,16 +427,63 @@
     dlg.addEventListener('close', () => {
       if (detailId === id) detailId = null;
     });
-    dlg.addEventListener('click', (event) => {
+    dlg.addEventListener('click', async (event) => {
       const cur = caseById(id);
       if (!cur) return;
       const act = event.target.closest('[data-act]')?.dataset.act;
       const taskId = event.target.closest('[data-task]')?.dataset.task;
       const undoId = event.target.closest('[data-undo]')?.dataset.undo;
-      if (act) ({ approve: approveCase, decline: declineCase, edit: editCase, close: closeCase })[act](cur);
-      if (taskId) doTask(cur, cur.tasks.find((t) => t.id === taskId));
-      if (undoId) undoTask(cur, cur.tasks.find((t) => t.id === undoId));
+      const openDoc = event.target.closest('[data-doc-open]')?.dataset.docOpen;
+      const removeDoc = event.target.closest('[data-doc-remove]')?.dataset.docRemove;
+      try {
+        if (act) await ({ approve: approveCase, decline: declineCase, edit: editCase, close: closeCase, addDocs: addDocuments })[act](cur);
+        if (taskId) doTask(cur, cur.tasks.find((t) => t.id === taskId));
+        if (undoId) await undoTask(cur, cur.tasks.find((t) => t.id === undoId));
+        if (openDoc) await api.openDocument(id, openDoc);
+        if (removeDoc) await removeDocument(cur, cur.documents.find((d) => d.id === removeDoc));
+      } catch (err) {
+        toast(err.message, 'error');
+      }
     });
+    // Files dropped anywhere on the case's window are added to it.
+    const hasFiles = (event) => [...(event.dataTransfer?.types || [])].includes('Files');
+    dlg.addEventListener('dragover', (event) => {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      dlg.classList.add('dropping');
+    });
+    dlg.addEventListener('dragleave', (event) => {
+      if (!event.relatedTarget || !dlg.contains(event.relatedTarget)) dlg.classList.remove('dropping');
+    });
+    dlg.addEventListener('drop', async (event) => {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      dlg.classList.remove('dropping');
+      try {
+        const added = await api.dropDocuments(id, event.dataTransfer.files);
+        await afterChange(`Added ${plural(added, 'document')}.`);
+      } catch (err) {
+        toast(err.message, 'error');
+      }
+    });
+  }
+
+  function fileSize(bytes) {
+    if (typeof bytes !== 'number') return '';
+    if (bytes < 1024) return `${bytes} bytes`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  async function addDocuments(c) {
+    const added = await api.chooseDocuments(c.id);
+    if (added) await afterChange(`Added ${plural(added, 'document')}.`);
+  }
+
+  async function removeDocument(c, doc) {
+    if (!doc || !window.confirm(`Remove ${doc.name} from this case? Its copy in the AB Apps folder is deleted too.`)) return;
+    await api.removeDocument(c.id, doc.id);
+    await afterChange(`Removed ${doc.name}.`);
   }
 
   /** Redraws an open case dialog after a change. */
@@ -684,6 +745,9 @@
       toast(err.message, 'error');
     }
   });
+
+  // A file dropped outside a case's window does nothing, rather than opening in place of the app.
+  for (const type of ['dragover', 'drop']) document.addEventListener(type, (event) => event.preventDefault());
 
   api.onStateChanged(load);
   api.onUpdateProgress(({ percent }) => {

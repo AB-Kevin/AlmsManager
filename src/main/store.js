@@ -3,6 +3,7 @@
 // AlmsManager keeps everything in its subfolder of the AB Apps folder:
 //
 //   AlmsManager\cases\<id>.json  one file per case (see shared/cases.js)
+//   AlmsManager\files\<id>\      copies of the documents added to that case
 //   AlmsManager\settings.json    who the reminders go to; managers change it
 //   AlmsManager\reminders.json   what Power Automate reads to send the daily
 //                                reminder (see docs/power-automate.md)
@@ -127,6 +128,75 @@ function writeSettings(dir, input, { by, now }) {
   return settings;
 }
 
+// Documents ---------------------------------------------------------------
+//
+// A document is copied into the case's folder rather than linked where it
+// was, so it opens on every computer that syncs the AB Apps folder, and stays
+// when the original is moved or deleted. Each copy is written once and never
+// changed, so two computers never write the same file.
+
+const CASE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function filesDir(dir, caseId) {
+  if (!CASE_ID.test(caseId)) throw new Error('That case can\'t be found.');
+  return path.join(dir, 'files', caseId);
+}
+
+/** A name Windows and OneDrive accept: no reserved characters, no trailing dots or spaces, not too long. */
+function safeFileName(name) {
+  let clean = String(name ?? '').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/[. ]+$/, '').trim();
+  if (/^(con|prn|aux|nul|com\d|lpt\d)(\.|$)/i.test(clean)) clean = `_${clean}`;
+  // documentPath refuses names starting with a dot, so ".pdf" becomes "document.pdf".
+  if (clean.startsWith('.')) clean = `document${clean}`;
+  const ext = path.extname(clean).slice(0, 20);
+  const stem = clean.slice(0, clean.length - path.extname(clean).length).slice(0, 120);
+  return stem ? `${stem}${ext}` : `document${ext}`;
+}
+
+/**
+ * Copies a file into the case's folder, under its own name, or "name (2).pdf"
+ * when that's taken. Returns { file, name, size }: the copy's name and the
+ * original's.
+ */
+function copyDocument(dir, caseId, source) {
+  const folder = filesDir(dir, caseId);
+  let stat;
+  try {
+    stat = fs.statSync(source);
+  } catch {
+    throw new Error(`${path.basename(source)} can't be found.`);
+  }
+  if (!stat.isFile()) throw new Error(`${path.basename(source)} is a folder, not a file.`);
+  fs.mkdirSync(folder, { recursive: true });
+  const base = safeFileName(path.basename(source));
+  const ext = path.extname(base);
+  const stem = base.slice(0, base.length - ext.length);
+  for (let n = 1; ; n++) {
+    const file = n === 1 ? base : `${stem} (${n})${ext}`;
+    try {
+      fs.copyFileSync(source, path.join(folder, file), fs.constants.COPYFILE_EXCL);
+      return { file, name: path.basename(source), size: stat.size };
+    } catch (err) {
+      if (err.code !== 'EEXIST' || n > 999) throw new Error(`${path.basename(source)} couldn't be copied: ${err.message}`);
+    }
+  }
+}
+
+/** Where a case's document is. `file` is only ever a name in the case's folder. */
+function documentPath(dir, caseId, file) {
+  if (typeof file !== 'string' || !file || path.basename(file) !== file || file.startsWith('.')) throw new Error('That document can\'t be found.');
+  return path.join(filesDir(dir, caseId), file);
+}
+
+/** Deletes a document's copy; OneDrive keeps it in its recycle bin for a while. */
+function deleteDocument(dir, caseId, file) {
+  try {
+    fs.rmSync(documentPath(dir, caseId, file), { force: true });
+  } catch {
+    // Already gone, or locked open on this computer: harmless either way.
+  }
+}
+
 function readReminders(dir) {
   try {
     return readJson(remindersPath(dir), null);
@@ -149,5 +219,9 @@ module.exports = {
   readSettings,
   writeSettings,
   cleanEmails,
+  safeFileName,
+  copyDocument,
+  documentPath,
+  deleteDocument,
   readReminders,
 };

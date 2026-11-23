@@ -96,3 +96,21 @@ test('declining', () => {
   assert.equal(c.status, 'declined');
   assert.match(c.history.at(-1).text, /Covered by the church/);
 });
+
+test('documents are added and removed, each logged', () => {
+  const c = approvedCase();
+  C.addDocuments(c, [{ id: 'd1', file: 'letter.pdf', name: 'letter.pdf', size: 2048 }, { id: 'd2', file: 'bill (2).pdf', name: 'bill.pdf', size: 10 }], ctx('Lee'));
+  assert.deepEqual(c.documents.map((d) => [d.id, d.file, d.addedBy]), [['d1', 'letter.pdf', 'Lee'], ['d2', 'bill (2).pdf', 'Lee']]);
+  assert.match(c.history.at(-1).text, /Added 2 documents: letter\.pdf, bill\.pdf/);
+  assert.equal(C.removeDocument(c, 'd1', ctx()).file, 'letter.pdf');
+  assert.deepEqual(c.documents.map((d) => d.id), ['d2']);
+  assert.match(c.history.at(-1).text, /Removed letter\.pdf/);
+  assert.throws(() => C.removeDocument(c, 'd1', ctx()), /no longer on this case/);
+});
+
+test('a case saved before documents existed can still have them added', () => {
+  const c = approvedCase();
+  delete c.documents;
+  C.addDocuments(c, [{ id: 'd1', file: 'a.pdf', name: 'a.pdf', size: 1 }], ctx());
+  assert.equal(c.documents.length, 1);
+});

@@ -1,6 +1,6 @@
 'use strict';
 
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 /** Calls the main process and unwraps { ok, value, error }. */
 async function call(channel, ...args) {
@@ -20,6 +20,10 @@ contextBridge.exposeInMainWorld('api', {
   markPaid: (id, taskId, input) => call('task:paid', id, taskId, input),
   review: (id, taskId, input) => call('task:review', id, taskId, input),
   undo: (id, taskId) => call('task:undo', id, taskId),
+  chooseDocuments: (id) => call('doc:add', id, null),
+  dropDocuments: (id, files) => call('doc:add', id, Array.from(files, (file) => webUtils.getPathForFile(file))),
+  openDocument: (id, docId) => call('doc:open', id, docId),
+  removeDocument: (id, docId) => call('doc:remove', id, docId),
   saveSettings: (input) => call('settings:save', input),
   openFolder: () => call('folder:open'),
   copyRemindersPath: () => call('reminders:copy-path'),

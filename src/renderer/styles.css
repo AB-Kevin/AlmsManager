@@ -420,3 +420,11 @@ textarea { resize: vertical; }
   font-size: var(--text-small);
 }
 .toast.error { border-left-color: var(--fill-action); }
+
+/* Documents on a case */
+.sub-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin: var(--space-5) 0 var(--space-2); }
+.sub-head .sub { margin: 0; }
+.docs { list-style: none; padding: 0; margin: 0; }
+.docs li { display: flex; align-items: baseline; gap: var(--space-3); padding: var(--space-2) 0; border-bottom: 1px solid var(--border-faint); }
+.docs li .link:last-child { margin-left: auto; }
+.dialog.dropping { outline: 3px dashed var(--border-rule); outline-offset: -12px; }

@@ -20,6 +20,8 @@ There is no separate sign-in. AlmsManager uses whoever is signed in to [AB Apps]
    - **Don't renew** lets it end when the approval runs out. Any payments left in the year are still due.
 5. **Close case** ends an approved case early. Its tasks not yet done are dropped.
 
+**Documents:** add a request letter, a bill or anything else to a case with **Add document…**, or by dropping files on the case's window. Each file is copied into the AB Apps folder, so it opens on every computer and stays even if the original is moved or deleted. **Remove** takes it off the case and deletes the copy.
+
 Every change is kept in the case's history, with who made it and when. **Undo** takes back a task marked done by mistake. A renewal can't be undone; change the case's dates with **Edit** instead.
 
 **Who can use it:** everyone the app is given to on AB Apps' **App access** page can add, approve and mark cases. By default that's managers only. Only managers change who gets the reminder email.
@@ -38,7 +40,8 @@ Everything lives in the `AlmsManager` subfolder of the AB Apps folder:
 
 | File | What it is | Written by |
 | --- | --- | --- |
-| `cases/<id>.json` | one case: its details, approval, done tasks and history | anyone, one case at a time |
+| `cases/<id>.json` | one case: its details, approval, done tasks, documents and history | anyone, one case at a time |
+| `files/<id>/` | copies of that case's documents, each written once and never changed | whoever adds it |
 | `settings.json` | who gets the reminder email | managers |
 | `reminders.json` | what Power Automate reads | any computer with AlmsManager open; rebuilt from the cases |
 

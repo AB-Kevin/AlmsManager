@@ -79,6 +79,7 @@ function newCase(input, ctx, id) {
     approvedThrough: null,
     closedOn: null,
     done: {},
+    documents: [],
     history: [],
     createdAt: at,
     updatedAt: at,
@@ -241,4 +242,30 @@ function undo(c, taskId, ctx) {
   return c;
 }
 
-module.exports = { METHODS, recipientOf, newCase, approve, decline, close, edit, markPaid, review, undo };
+/**
+ * Records documents already copied into the case's folder (store.js
+ * copyDocument): `files` are { id, file, name, size }, where `file` is the
+ * copy's name in the folder and `name` the original's. Any case can have
+ * documents added, closed ones too, to keep its paperwork together.
+ */
+function addDocuments(c, files, ctx) {
+  if (!files.length) return c;
+  c.documents ??= [];
+  const at = ctx.now.toISOString();
+  for (const f of files) {
+    c.documents.push({ id: f.id, name: text(f.name, 255) || f.file, file: f.file, size: f.size ?? null, addedAt: at, addedBy: ctx.by });
+  }
+  note(c, ctx, files.length === 1 ? `Added ${files[0].name}.` : `Added ${files.length} documents: ${files.map((f) => f.name).join(', ')}.`);
+  return c;
+}
+
+/** Takes a document off the case. Returns it, so its copy can be deleted. */
+function removeDocument(c, docId, ctx) {
+  const doc = (c.documents || []).find((d) => d.id === docId);
+  if (!doc) throw new Error('That document is no longer on this case.');
+  c.documents = c.documents.filter((d) => d.id !== docId);
+  note(c, ctx, `Removed ${doc.name}.`);
+  return doc;
+}
+
+module.exports = { METHODS, recipientOf, newCase, approve, decline, close, edit, markPaid, review, undo, addDocuments, removeDocument };

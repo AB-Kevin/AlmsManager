@@ -248,6 +248,45 @@ function registerIpc() {
   handle('task:review', (id, taskId, input) => change(id, (c, x) => cases.review(c, taskId, input, x)));
   handle('task:undo', (id, taskId) => change(id, (c, x) => cases.undo(c, taskId, x)));
 
+  // Documents: `paths` are files dropped on the case; without them, a file dialog asks.
+  handle('doc:add', async (id, paths) => {
+    const context = ctx();
+    store.readCase(dir, id); // the case is there before anything is copied
+    let sources = Array.isArray(paths) ? paths.filter((p) => typeof p === 'string' && p) : null;
+    if (!sources) {
+      const result = await dialog.showOpenDialog(win, { title: 'Add documents to the case', properties: ['openFile', 'multiSelections'] });
+      if (result.canceled) return 0;
+      sources = result.filePaths;
+    }
+    if (!sources.length) return 0;
+    const copied = [];
+    try {
+      for (const source of sources) copied.push({ id: crypto.randomUUID(), ...store.copyDocument(dir, id, source) });
+      store.updateCase(dir, id, (c) => cases.addDocuments(c, copied, context));
+    } catch (err) {
+      // Nothing half-added: copies the case doesn't list would never be seen.
+      for (const f of copied) store.deleteDocument(dir, id, f.file);
+      throw err;
+    }
+    refresh();
+    return copied.length;
+  });
+  handle('doc:open', async (id, docId) => {
+    ctx();
+    const doc = (store.readCase(dir, id).documents || []).find((d) => d.id === docId);
+    if (!doc) throw new Error('That document is no longer on this case.');
+    const file = store.documentPath(dir, id, doc.file);
+    if (!fs.existsSync(file)) throw new Error(`${doc.name} isn't on this computer yet. If it was just added on another computer, wait for OneDrive to sync it.`);
+    const error = await shell.openPath(file);
+    if (error) throw new Error(error);
+  });
+  handle('doc:remove', (id, docId) => {
+    const context = ctx();
+    const doc = store.updateCase(dir, id, (c) => cases.removeDocument(c, docId, context));
+    store.deleteDocument(dir, id, doc.file);
+    refresh();
+  });
+
   handle('settings:save', (input) => {
     const context = ctx();
     if (identity.class !== 'manager') throw new Error('Only a manager can change who the reminders go to.');
