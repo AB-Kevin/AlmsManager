@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:">
+  <title>AlmsManager</title>
+  <link rel="stylesheet" href="../../node_modules/@fontsource/poppins/300.css">
+  <link rel="stylesheet" href="../../node_modules/@fontsource/poppins/400.css">
+  <link rel="stylesheet" href="../../node_modules/@fontsource/poppins/500.css">
+  <link rel="stylesheet" href="../../node_modules/@fontsource/poppins/600.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <img class="logo" src="assets/logo-primary-lockup.jpg" alt="Anabaptist Brotherhood">
+      <span class="app-name">AlmsManager</span>
+    </div>
+    <nav class="tabs" aria-label="Sections">
+      <button class="tab" data-view="tasks">Tasks <span class="tab-count" id="due-count" hidden></span></button>
+      <button class="tab" data-view="cases">Cases <span class="tab-count" id="request-count" hidden title="Requests waiting for a decision"></span></button>
+      <button class="tab" data-view="settings">Settings</button>
+    </nav>
+    <span class="who muted small" id="who"></span>
+  </header>
+  <div class="banner" id="banner" role="status" hidden></div>
+
+  <main>
+    <section class="view scroll" id="view-tasks">
+      <div class="page" id="tasks-page"></div>
+    </section>
+    <section class="view scroll" id="view-cases" hidden>
+      <div class="page" id="cases-page"></div>
+    </section>
+    <section class="view scroll" id="view-settings" hidden>
+      <div class="page narrow" id="settings-page"></div>
+    </section>
+    <section class="view scroll" id="view-blocked" hidden>
+      <div class="page narrow" id="blocked-page"></div>
+    </section>
+  </main>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+  <script src="../shared/schedule.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
